@@ -1,0 +1,190 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ---------------------------------------------------------------------------
+// SEC document ingestion
+// ---------------------------------------------------------------------------
+
+model DocumentLog {
+  id              String   @id @default(cuid())
+  source          String
+  ticker          String
+  title           String
+  rawText         String   @db.Text
+  cleanedText     String   @db.Text
+  accessionNumber String?  @unique
+  filedAt         DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  embedding DocumentEmbedding?
+  analyses  AnalysisReport[]
+
+  @@index([ticker])
+  @@index([filedAt])
+  @@index([createdAt])
+  @@index([ticker, filedAt, createdAt])
+}
+
+model DocumentEmbedding {
+  id            String      @id @default(cuid())
+  documentLogId String      @unique
+  documentLog   DocumentLog @relation(fields: [documentLogId], references: [id], onDelete: Cascade)
+  /// OpenAI-compatible embedding dimension (1536). Adjust if using a different model.
+  embedding     Unsupported("vector(1536)")
+  createdAt     DateTime    @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// LLM analysis output
+// ---------------------------------------------------------------------------
+
+model AnalysisReport {
+  id             String         @id @default(cuid())
+  documentLogId  String
+  documentLog    DocumentLog    @relation(fields: [documentLogId], references: [id], onDelete: Cascade)
+  catalystType   CatalystType
+  direction      TradeDirection
+  magnitudeScore Float
+  reasoning      String         @db.Text
+  tokenCount     Int?
+  latencyMs      Int?
+  createdAt      DateTime       @default(now())
+
+  tradeLogs TradeLog[]
+
+  @@index([documentLogId])
+  @@index([catalystType])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Trade execution logs
+// ---------------------------------------------------------------------------
+
+model TradeLog {
+  id               String          @id @default(cuid())
+  analysisReportId String?
+  analysisReport   AnalysisReport? @relation(fields: [analysisReportId], references: [id], onDelete: SetNull)
+  ticker           String
+  side             TradeSide
+  quantity         Float
+  price            Float?
+  mode             TradingMode
+  status           TradeStatus
+  blockReason      String?
+  alpacaOrderId    String?
+  strategy         StrategyType?
+  legs             Json?
+  totalPremiumPaid Float?
+  positionGroupId  String?
+  exitAt           DateTime?
+  exitCondition    ExitCondition?
+  netExitValue     Float?
+  createdAt        DateTime        @default(now())
+
+  @@index([ticker])
+  @@index([mode])
+  @@index([status])
+  @@index([positionGroupId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Backtesting
+// ---------------------------------------------------------------------------
+
+model BacktestRun {
+  id            String    @id @default(cuid())
+  name          String
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  parameters    Json?
+  initialEquity Float
+  finalEquity   Float?
+  createdAt     DateTime  @default(now())
+
+  trades BacktestTrade[]
+}
+
+model BacktestTrade {
+  id               String          @id @default(cuid())
+  backtestRunId    String
+  backtestRun      BacktestRun     @relation(fields: [backtestRunId], references: [id], onDelete: Cascade)
+  ticker           String
+  side             TradeSide
+  quantity         Float
+  price            Float
+  simulatedAt      DateTime
+  catalystType     CatalystType
+  direction        TradeDirection
+  magnitudeScore   Float
+  reasoning        String          @db.Text
+  strategy         StrategyType
+  legs             Json
+  totalPremiumPaid Float
+  exitAt           DateTime?
+  exitCondition    ExitCondition?
+  netExitValue     Float?
+  pnl              Float?
+  createdAt        DateTime        @default(now())
+
+  @@index([backtestRunId])
+  @@index([simulatedAt])
+  @@index([backtestRunId, simulatedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum CatalystType {
+  DIRECTIONAL
+  VOLATILITY
+  NONE
+}
+
+enum TradeDirection {
+  BULLISH
+  BEARISH
+  NEUTRAL
+}
+
+enum StrategyType {
+  ATM_CALL
+  ATM_PUT
+  STRADDLE
+  STRANGLE
+}
+
+enum ExitCondition {
+  TAKE_PROFIT
+  STOP_LOSS
+  TIME_STOP
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}
+
+enum TradingMode {
+  PAPER
+  LIVE
+}
+
+enum TradeStatus {
+  EXECUTED
+  PENDING
+  BLOCKED
+  REJECTED
+  FAILED
+}

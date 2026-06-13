@@ -1,0 +1,21 @@
+services:
+  alpha_trading_db:
+    image: pgvector/pgvector:pg16
+    container_name: alpha_trading_db
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-alpha}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alpha}
+      POSTGRES_DB: ${POSTGRES_DB:-alpha_trading}
+    volumes:
+      - alpha_trading_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alpha} -d ${POSTGRES_DB:-alpha_trading}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  alpha_trading_data:

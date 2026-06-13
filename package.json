@@ -1,0 +1,28 @@
+{
+  "name": "edgar-eye",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:generate": "npm run generate --workspace=@edgar-eye/database",
+    "db:migrate": "npm run migrate --workspace=@edgar-eye/database --",
+    "db:push": "npm run push --workspace=@edgar-eye/database",
+    "db:studio": "npm run studio --workspace=@edgar-eye/database",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev:backend": "dotenv -e .env -- npm run dev --workspace=@edgar-eye/backend",
+    "dev:frontend": "npm run dev --workspace=@edgar-eye/frontend",
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "dotenv-cli": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
